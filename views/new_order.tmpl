@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Новый заказ</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+
+<h2>Submit Form</h2>
+
+<form id="myForm">
+    <label for="field">Данные о заказе в формате JSON:</label><br>
+    <input type="text" id="field" name="field"><br>
+    <input type="button" value="Submit" onclick="submitForm()">
+</form>
+
+<script>
+    function submitForm(){
+        var field = document.getElementById('field').value;
+        $.ajax({
+            url: '/new_order',
+            type: 'post',
+            contentType: 'application/json',
+            data: JSON.stringify(field),
+            success: function(response){
+                alert('Form submitted successfully');
+            },
+            error: function(jqXHR, textStatus, errorThrown){
+                console.log(textStatus, errorThrown);
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

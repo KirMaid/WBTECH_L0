@@ -1,12 +1,12 @@
-package main
+package database
 
 import (
-	"L0/server/models"
+	"L0/models"
 	"database/sql"
 	_ "github.com/lib/pq"
 )
 
-func connectDB() (*sql.DB, error) {
+func ConnectDB() (*sql.DB, error) {
 	connStr := "user=user password=password dbname=db port=5452 sslmode=disable TimeZone=Europe/Moscow"
 	conn, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -15,8 +15,8 @@ func connectDB() (*sql.DB, error) {
 	return conn, nil
 }
 
-func getOrderFromDatabase(orderUid string) (models.OrderData, error) {
-	db, err := connectDB()
+func GetOrderFromDatabase(orderUid string) (models.OrderData, error) {
+	db, err := ConnectDB()
 	if err != nil {
 		return models.OrderData{}, err
 	}
