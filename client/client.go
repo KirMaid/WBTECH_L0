@@ -1,118 +1,62 @@
 package main
 
 import (
-	"fmt"
+	"L0/server/models"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
-	"github.com/nats-io/stan.go"
-	"log"
 	"net/http"
 )
 
-const portNumber = ":8080"
-
-func HomePageHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("We're live !!!"))
-	// Подключение к серверу NATS Streaming
-	sc, _ := stan.Connect("test-cluster", "client")
-	defer sc.Close()
-
-	// Подписка на канал
-	_, err := sc.QueueSubscribe("subject", "queue-group", func(msg *stan.Msg) {
-		// Обработка полученного сообщения
-		fmt.Printf("Received a message: %s\n", string(msg.Data))
-	})
-
-	if err != nil {
-		log.Fatalf("Failed to subscribe: %v", err)
-	}
-
-	// Ожидание сообщений...
-	select {}
-}
+const portNumber = ":8070"
 
 func main() {
-	router := gin.Default()
-	router.LoadHTMLGlob("client/views/*")
-	router.POST("/submit", func(c *gin.Context) {
-		var text string
-		// Валидация входных данных и связывание их с переменной text
-		if err := c.ShouldBindQuery(&text); err != nil {
+	r := gin.Default()
+	r.GET("/orders/:order_uid", getOrder)
+	r.POST("/submit", func(c *gin.Context) {
+		var formData models.OrderData
+
+		if err := c.ShouldBindJSON(&formData); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		// Используйте данные формы
-		c.JSON(http.StatusOK, gin.H{"text": text})
+
+		jsonData, err := json.Marshal(formData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		sendOrder(jsonData)
+
+		// Теперь jsonData - это []byte, который вы можете использовать как захотите
+		// ...
+
+		c.JSON(http.StatusOK, gin.H{"message": "Success!"})
 	})
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-			"title": "Main website",
-		})
-	})
-	router.Run(":8070")
+	r.Run(":8070") // listen and serve on 0.0.0.0:8080
 }
 
-func getOrderId(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+func getOrder(c *gin.Context) {
+	uid := c.Param("order_uid")
+	order, status := getCache(uid)
+	if !status {
+		var err error
+		order, err = getOrderFromDatabase(uid)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			return
+		}
+		setCache(uid, order)
+	}
+
+	jsonData, err := json.MarshalIndent(order, "", " ")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
-	orderId := r.FormValue("orderId")
-	getOrder(orderId)
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.String(http.StatusOK, "<pre>\n%s\n</pre>", string(jsonData))
 }
 
-func getOrder(orderId string) {
-	sendOrderId(orderId)
-	reciveOrder()
-	/*// Подключение к NATS Streaming Server
-	sc, _ := stan.Connect("test-cluster", "client")
-	defer sc.Close()
+func sendOrder(order []byte) {
 
-	// Отправка сообщения
-	err := sc.Publish("orderIds", []byte(orderId))
-	if err != nil {
-		log.Fatal(err)
-	}*/
 }
-
-func sendOrderId(orderId string) {
-	// Подключение к NATS Streaming Server
-	sc, _ := stan.Connect("test-cluster", "client")
-	defer sc.Close()
-
-	// Отправка сообщения
-	err := sc.Publish("orderIds", []byte(orderId))
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func reciveOrder() {
-	// Подключение к серверу NATS Streaming
-	sc, _ := stan.Connect("test-cluster", "client")
-	defer sc.Close()
-
-	// Подписка на канал
-	_, err := sc.QueueSubscribe("orders", "queue-group", func(msg *stan.Msg) {
-		// Обработка полученного сообщения
-		fmt.Printf("Received a message: %s\n", string(msg.Data))
-	})
-
-	if err != nil {
-		log.Fatalf("Failed to subscribe: %v", err)
-	}
-
-	// Ожидание сообщений...
-	select {}
-}
-
-//	http.HandleFunc("/", HomePageHandler)
-//	http.ListenAndServe(portNumber, nil)
-//}
-
-//func setupRouter() *gin.Engine {
-//	router := gin.Default()
-//
-//	router.StaticFS("/static", http.Dir("./public/static"))
-//
-//	return router
-//}
