@@ -9,6 +9,40 @@ import (
 	"log"
 )
 
+var clientID = "server"
+var sc stan.Conn
+
+func setupSubscribe() {
+	_, err := sc.QueueSubscribe("order", "queue-group", func(msg *stan.Msg) {
+		var orderData models.Order
+		err := json.Unmarshal(msg.Data, &orderData)
+		if err != nil {
+			log.Fatalf("Failed to parse JSON: %v", err)
+		}
+		err = setOrder(msg.Data)
+
+		if err != nil {
+			log.Fatalf("Failed to insert to DB: %v", err)
+		}
+	})
+	if err != nil {
+		log.Fatalf("Failed to Subscribe: %v", err)
+	}
+}
+func setupNatsConn() {
+	sc, _ = stan.Connect("test-cluster", clientID, stan.SetConnectionLostHandler(func(_ stan.Conn, reason error) {
+		log.Printf("Connection lost, reason: %v\n", reason)
+		setupNatsConn() // Попытка переподключения
+	}))
+	setupSubscribe()
+	log.Printf("Sucsessfully connected!")
+}
+
+func main() {
+	setupNatsConn()
+	select {}
+}
+
 func setOrder(jsonOrder []byte) error {
 	var order models.Order
 	err := json.Unmarshal(jsonOrder, &order)
@@ -56,28 +90,4 @@ func setOrder(jsonOrder []byte) error {
 		}
 	}
 	return nil
-}
-
-func main() {
-	sc, _ := stan.Connect("test-cluster", "server")
-	defer sc.Close()
-
-	_, err := sc.QueueSubscribe("order", "queue-group", func(msg *stan.Msg) {
-		var orderData models.Order
-		err := json.Unmarshal(msg.Data, &orderData)
-		if err != nil {
-			log.Fatalf("Failed to parse JSON: %v", err)
-		}
-		err = setOrder(msg.Data)
-
-		if err != nil {
-			log.Fatalf("Failed to insert to DB: %v", err)
-		}
-	})
-
-	if err != nil {
-		log.Fatalf("Failed to subscribe: %v", err)
-	}
-
-	select {}
 }

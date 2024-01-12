@@ -12,7 +12,30 @@ import (
 
 const portNumber = ":8070"
 
+var sc stan.Conn
+var clientID = "client"
+
+func setupNatsConn() {
+	var err error
+	sc, err = stan.Connect("test-cluster", clientID, stan.SetConnectionLostHandler(func(_ stan.Conn, reason error) {
+		log.Printf("Connection lost, reason: %v\n", reason)
+		setupNatsConn() // Попытка переподключения
+	}))
+	if err != nil {
+		log.Fatalf("Connect failed:: %v\n", err)
+	}
+	log.Printf("Sucsessfully connected!")
+}
+func sendOrder(order []byte) error {
+	err := sc.Publish("order", order)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
+	setupNatsConn()
 	r := gin.Default()
 	if cacheIsEmpty() {
 		err := setOrdersToCache(10)
@@ -21,25 +44,7 @@ func main() {
 		}
 	}
 	r.GET("/orders/:order_uid", getOrder)
-	r.POST("/new_order", func(c *gin.Context) {
-		var formData models.Order
-		if err := c.ShouldBindJSON(&formData); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		jsonData, err := json.Marshal(formData)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		err = sendOrder(jsonData)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "Success!"})
-	})
+	r.POST("/new_order", newOrder)
 	r.Run(portNumber)
 }
 
@@ -65,14 +70,29 @@ func getOrder(c *gin.Context) {
 	c.String(http.StatusOK, "<pre>\n%s\n</pre>", string(jsonData))
 }
 
-func sendOrder(order []byte) error {
-	sc, _ := stan.Connect("test-cluster", "client")
-	defer sc.Close()
-	err := sc.Publish("order", order)
-	if err != nil {
-		return err
+func newOrder(c *gin.Context) {
+	var formData models.Order
+	if err := c.ShouldBindJSON(&formData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	return nil
+	jsonData, err := json.Marshal(formData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = sendOrder(jsonData)
+
+	if err != nil {
+		log.Printf("Connection lost, reason: %v", err)
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Success!"})
 }
 
 func setOrdersToCache(limit int) error {
