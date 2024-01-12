@@ -21,7 +21,12 @@
             url: '/new_order',
             type: 'post',
             contentType: 'application/json',
-            data: JSON.stringify(field),
+            data: JSON.stringify(field, function(key, value) {
+                if (typeof value === 'number') {
+                    return value.toString();
+                }
+                return value;
+            }),
             success: function(response){
                 alert('Form submitted successfully');
             },

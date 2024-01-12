@@ -15,8 +15,7 @@ func main() {
 	r := gin.Default()
 	r.GET("/orders/:order_uid", getOrder)
 	r.POST("/new_order", func(c *gin.Context) {
-		var formData models.OrderData
-
+		var formData models.Order
 		if err := c.ShouldBindJSON(&formData); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -26,6 +25,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
 		err = sendOrder(jsonData)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -33,7 +33,7 @@ func main() {
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "Success!"})
 	})
-	r.Run(portNumber) // listen and serve on 0.0.0.0:8080
+	r.Run(portNumber)
 }
 
 func getOrder(c *gin.Context) {

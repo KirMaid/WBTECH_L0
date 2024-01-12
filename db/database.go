@@ -15,22 +15,22 @@ func ConnectDB() (*sql.DB, error) {
 	return conn, nil
 }
 
-func GetOrderFromDatabase(orderUid string) (models.OrderData, error) {
+func GetOrderFromDatabase(orderUid string) (models.Order, error) {
 	db, err := ConnectDB()
 	if err != nil {
-		return models.OrderData{}, err
+		return models.Order{}, err
 	}
 
 	orderData, err := getOrderData(db, orderUid)
 
 	if err != nil {
-		return models.OrderData{}, err
+		return models.Order{}, err
 	}
 
 	items, err := getOrderItems(db, orderUid)
 
 	if err != nil {
-		return models.OrderData{}, err
+		return models.Order{}, err
 	}
 
 	orderData.Items = items
@@ -38,7 +38,7 @@ func GetOrderFromDatabase(orderUid string) (models.OrderData, error) {
 	return orderData, nil
 }
 
-func getOrderData(db *sql.DB, orderUid string) (models.OrderData, error) {
+func getOrderData(db *sql.DB, orderUid string) (models.Order, error) {
 	rows, err := db.Query(`
 		SELECT orders.order_uid, track_number, entry, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard, 
 		       deliveries.name, phone, zip, city, address, region, email, 
@@ -50,30 +50,29 @@ func getOrderData(db *sql.DB, orderUid string) (models.OrderData, error) {
 	`, orderUid)
 
 	if err != nil {
-		return models.OrderData{}, err
+		return models.Order{}, err
 	}
 
 	defer rows.Close()
 
-	var orderData models.OrderData
+	var order models.Order
 
 	for rows.Next() {
-		var o models.Order
 		var d models.Delivery
 		var p models.Payment
 
 		err := rows.Scan(
-			&o.OrderUid,
-			&o.TrackNumber,
-			&o.Entry,
-			&o.Locale,
-			&o.InternalSignature,
-			&o.CustomerId,
-			&o.DeliveryService,
-			&o.Shardkey,
-			&o.SmId,
-			&o.DateCreated,
-			&o.OofShard,
+			&order.OrderUid,
+			&order.TrackNumber,
+			&order.Entry,
+			&order.Locale,
+			&order.InternalSignature,
+			&order.CustomerId,
+			&order.DeliveryService,
+			&order.Shardkey,
+			&order.SmId,
+			&order.DateCreated,
+			&order.OofShard,
 			&d.Name,
 			&d.Phone,
 			&d.Zip,
@@ -93,19 +92,18 @@ func getOrderData(db *sql.DB, orderUid string) (models.OrderData, error) {
 			&p.CustomFee)
 
 		if err != nil {
-			return models.OrderData{}, err
+			return models.Order{}, err
 		}
 
-		orderData.Order = o
-		orderData.Delivery = d
-		orderData.Payment = p
+		order.Delivery = d
+		order.Payment = p
 	}
 
-	if (orderData.Payment == models.Payment{} || (orderData.Delivery == models.Delivery{})) {
-		return models.OrderData{}, sql.ErrNoRows
+	if (order.Payment == models.Payment{} || (order.Delivery == models.Delivery{})) {
+		return models.Order{}, sql.ErrNoRows
 	}
 
-	return orderData, err
+	return order, err
 }
 
 func getOrderItems(db *sql.DB, orderUid string) ([]models.Item, error) {
