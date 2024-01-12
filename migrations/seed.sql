@@ -22,3 +22,8 @@ INSERT INTO items (order_uid, chrt_id, track_number, price, rid, name, sale, siz
                    nm_id, brand, status)
 VALUES ('some_order_uid', 1, 'some_track_number', 100.00, 'some_rid', 'some_name',
         10.00, 'some_size', 90.00, 1, 'some_brand', 1);
+
+INSERT INTO items (order_uid, chrt_id, track_number, price, rid, name, sale, size, total_price,
+                   nm_id, brand, status)
+VALUES ('some_order_uid', 1, 'another_track_number', 100.00, 'another_rid', 'another_name',
+        10.00, 'another_size', 90.00, 1, 'another_brand', 1);
