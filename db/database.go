@@ -171,6 +171,7 @@ func getFirstOrdersIds(db *sql.DB, limit int) ([]models.Order, error) {
 		FROM orders
 		LEFT JOIN deliveries ON orders.order_uid = deliveries.order_uid
 		LEFT JOIN payments ON orders.order_uid = payments.order_uid
+		ORDER BY orders.order_uid DESC 
 		LIMIT $1
 	`, limit)
 
