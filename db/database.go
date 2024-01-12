@@ -139,3 +139,100 @@ func getOrderItems(db *sql.DB, orderUid string) ([]models.Item, error) {
 	defer rows.Close()
 	return items, err
 }
+
+func GetFirstOrdersFromDatabase(limit int) ([]models.Order, error) {
+	db, err := ConnectDB()
+	if err != nil {
+		return []models.Order{}, err
+	}
+
+	orders, err := getFirstOrdersIds(db, limit)
+
+	if err != nil {
+		return []models.Order{}, err
+	}
+
+	for _, order := range orders {
+		items, err := getOrderItems(db, order.OrderUid)
+		if err != nil {
+			return []models.Order{}, err
+		}
+		order.Items = items
+	}
+
+	return orders, nil
+}
+
+func getFirstOrdersIds(db *sql.DB, limit int) ([]models.Order, error) {
+	rows, err := db.Query(`
+		SELECT orders.order_uid, track_number, entry, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard, 
+		       deliveries.name, phone, zip, city, address, region, email, 
+		       payments.transaction, request_id, currency, provider, amount, dt, bank, delivery_cost, goods_total, custom_fee
+		FROM orders
+		LEFT JOIN deliveries ON orders.order_uid = deliveries.order_uid
+		LEFT JOIN payments ON orders.order_uid = payments.order_uid
+		LIMIT $1
+	`, limit)
+
+	if err != nil {
+		return []models.Order{}, err
+	}
+
+	defer rows.Close()
+
+	var orders []models.Order
+
+	for rows.Next() {
+		var order models.Order
+		var delivery models.Delivery
+		var payment models.Payment
+		err := rows.Scan(
+			&order.OrderUid,
+			&order.TrackNumber,
+			&order.Entry,
+			&order.Locale,
+			&order.InternalSignature,
+			&order.CustomerId,
+			&order.DeliveryService,
+			&order.Shardkey,
+			&order.SmId,
+			&order.DateCreated,
+			&order.OofShard,
+			&delivery.Name,
+			&delivery.Phone,
+			&delivery.Zip,
+			&delivery.City,
+			&delivery.Address,
+			&delivery.Region,
+			&delivery.Email,
+			&payment.Transaction,
+			&payment.RequestId,
+			&payment.Currency,
+			&payment.Provider,
+			&payment.Amount,
+			&payment.Dt,
+			&payment.Bank,
+			&payment.DeliveryCost,
+			&payment.GoodsTotal,
+			&payment.CustomFee)
+
+		if err != nil {
+			return []models.Order{}, err
+		}
+
+		order.Delivery = delivery
+		order.Payment = payment
+
+		if (order.Payment == models.Payment{} || (order.Delivery == models.Delivery{})) {
+			return []models.Order{}, sql.ErrNoRows
+		}
+
+		orders = append(orders, order)
+	}
+
+	if len(orders) == 0 {
+		return []models.Order{}, sql.ErrNoRows
+	}
+
+	return orders, err
+}

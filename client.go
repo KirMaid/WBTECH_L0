@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/nats-io/stan.go"
+	"log"
 	"net/http"
 )
 
@@ -13,6 +14,12 @@ const portNumber = ":8070"
 
 func main() {
 	r := gin.Default()
+	if cacheIsEmpty() {
+		err := setOrdersToCache(10)
+		if err != nil {
+			log.Fatalf("Failed to seed Cache: %v", err)
+		}
+	}
 	r.GET("/orders/:order_uid", getOrder)
 	r.POST("/new_order", func(c *gin.Context) {
 		var formData models.Order
@@ -64,6 +71,17 @@ func sendOrder(order []byte) error {
 	err := sc.Publish("order", order)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func setOrdersToCache(limit int) error {
+	orders, err := database.GetFirstOrdersFromDatabase(limit)
+	if err != nil {
+		return err
+	}
+	for _, order := range orders {
+		setCache(order.OrderUid, order)
 	}
 	return nil
 }
