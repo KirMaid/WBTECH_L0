@@ -152,12 +152,12 @@ func GetFirstOrdersFromDatabase(limit int) ([]models.Order, error) {
 		return []models.Order{}, err
 	}
 
-	for _, order := range orders {
-		items, err := getOrderItems(db, order.OrderUid)
+	for i := range orders {
+		items, err := getOrderItems(db, orders[i].OrderUid)
 		if err != nil {
 			return []models.Order{}, err
 		}
-		order.Items = items
+		orders[i].Items = items
 	}
 
 	return orders, nil
